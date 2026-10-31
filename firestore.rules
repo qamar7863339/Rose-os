@@ -1,0 +1,236 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny Catch-all)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- REUSABLE SECURITY PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isRootAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'qamarmujtaba700@gmail.com' ||
+        request.auth.token.email == 'founder@agencyrose.ai'
+      );
+    }
+
+    function isAdmin() {
+      return isRootAdmin() || (
+        isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function hasUserDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // User is a member of workspaceId if they are an admin, in members subcollection, or matched userDoc
+    // IMPORTANT: Clients are restricted to their own client workspace and cannot access agency workspace
+    function isWorkspaceMember(workspaceId) {
+      return isAdmin() || (
+        isSignedIn() && (
+          exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)) ||
+          (hasUserDoc() && getUserData().workspaceId == workspaceId && getUserData().role != 'client')
+        )
+      );
+    }
+
+    function getWorkspaceMemberRole(workspaceId) {
+      return get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role;
+    }
+
+    function isWorkspaceOwner(workspaceId) {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/workspaces/$(workspaceId)) &&
+         get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == request.auth.uid)
+      );
+    }
+
+    function isWorkspaceAdmin(workspaceId) {
+      return isAdmin() || isWorkspaceOwner(workspaceId) || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)) &&
+        getWorkspaceMemberRole(workspaceId) == 'super_admin'
+      );
+    }
+
+    // --- USER PROFILES ---
+    // Users can read own profile; only admins can list or delete
+    // Users CANNOT escalate role or reassign workspaceId/clientId arbitrarily
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId && (
+        !('role' in incoming()) || incoming().role != 'super_admin' || isRootAdmin()
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (request.auth.uid == userId &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // --- ADMIN PRIVILEGE REGISTRY ---
+    // Read allowed for authenticated users to verify admin state; write ONLY allowed by existing admin
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- MULTI-TENANT WORKSPACES ---
+    match /workspaces/{workspaceId} {
+      allow get: if isWorkspaceMember(workspaceId) || (
+        isSignedIn() && hasUserDoc() && getUserData().workspaceId == workspaceId
+      );
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && (
+        isAdmin() ||
+        (incoming().type == 'client' && incoming().ownerId == request.auth.uid)
+      );
+      allow update: if isWorkspaceAdmin(workspaceId);
+      allow delete: if isWorkspaceAdmin(workspaceId);
+
+      // Members Subcollection
+      match /members/{memberId} {
+        allow read: if isWorkspaceMember(workspaceId) || (isSignedIn() && request.auth.uid == memberId);
+        allow create: if isWorkspaceAdmin(workspaceId) || (isSignedIn() && request.auth.uid == memberId && incoming().role != 'super_admin');
+        allow update, delete: if isWorkspaceAdmin(workspaceId);
+      }
+
+      // Clients Subcollection
+      // Client users can ONLY read their own client document; Client A cannot access Client B
+      match /clients/{clientId} {
+        allow read: if isWorkspaceMember(workspaceId) || (
+          isSignedIn() && hasUserDoc() && getUserData().role == 'client' && (
+            clientId == getUserData().clientId ||
+            (resource != null && resource.data.email == request.auth.token.email)
+          )
+        );
+        allow create, update, delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // AI Agents Subcollection
+      // Clients can only read agents assigned to their client ID
+      match /agents/{agentId} {
+        allow read: if isWorkspaceMember(workspaceId) || (
+          isSignedIn() && hasUserDoc() && getUserData().role == 'client' &&
+          resource != null && resource.data.assignedClientId == getUserData().clientId
+        );
+        allow create, update, delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // CRM Leads Subcollection (Strictly Agency Only - Zero Client Access)
+      match /leads/{leadId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow create, update: if isWorkspaceMember(workspaceId)
+          && incoming().value is number && incoming().value >= 0
+          && incoming().score is number && incoming().score >= 0 && incoming().score <= 100
+          && incoming().status in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
+        allow delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Projects Subcollection
+      // Client A can ONLY read projects with clientId matching Client A
+      match /projects/{projectId} {
+        allow read: if isWorkspaceMember(workspaceId) || (
+          isSignedIn() && hasUserDoc() && getUserData().role == 'client' && (
+            resource != null && (
+              resource.data.clientId == getUserData().clientId ||
+              resource.data.client == getUserData().clientName
+            )
+          )
+        );
+        allow create, update: if isWorkspaceMember(workspaceId);
+        allow delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Tasks Subcollection
+      match /tasks/{taskId} {
+        allow read: if isWorkspaceMember(workspaceId) || (
+          isSignedIn() && hasUserDoc() && getUserData().role == 'client' &&
+          resource != null && resource.data.clientId == getUserData().clientId
+        );
+        allow create, update: if isWorkspaceMember(workspaceId)
+          && incoming().title is string && incoming().title.size() > 0 && incoming().title.size() <= 300
+          && incoming().status in ['todo', 'in_progress', 'done', 'blocked'];
+        allow delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Automations Subcollection
+      match /automations/{automationId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow create, update, delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Integrations Subcollection (Credentials & OAuth configs)
+      match /integrations/{integrationId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow create, update, delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Knowledge Documents Subcollection
+      match /documents/{documentId} {
+        allow read: if isWorkspaceMember(workspaceId) || (
+          isSignedIn() && hasUserDoc() && getUserData().role == 'client' && (
+            resource != null && (
+              resource.data.clientId == getUserData().clientId ||
+              resource.data.scope == 'client'
+            )
+          )
+        );
+        allow create, update, delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Workspace Memory Subcollection
+      match /memories/{memoryId} {
+        allow read, create, update: if isWorkspaceMember(workspaceId);
+        allow delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Human Approval Requests Subcollection
+      match /approvals/{approvalId} {
+        allow read, create: if isWorkspaceMember(workspaceId);
+        allow update, delete: if isWorkspaceAdmin(workspaceId) || isAdmin();
+      }
+
+      // Execution & Audit Logs Subcollection (Admin only update/delete)
+      match /logs/{logId} {
+        allow read, create: if isWorkspaceMember(workspaceId);
+        allow update, delete: if isAdmin();
+      }
+
+      // Usage Metering Subcollection
+      match /usage/{usageId} {
+        allow read, create, update: if isWorkspaceMember(workspaceId);
+        allow delete: if isAdmin();
+      }
+
+      // Conversations Subcollection
+      match /conversations/{conversationId} {
+        allow read, create, update, delete: if isWorkspaceMember(workspaceId) || (
+          isSignedIn() && hasUserDoc() && getUserData().role == 'client' &&
+          resource != null && resource.data.clientId == getUserData().clientId
+        );
+      }
+    }
+  }
+}

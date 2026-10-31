@@ -1,0 +1,6 @@
+{
+  "name": "ROSE AI OS",
+  "description": "AI-Native Business Operating System inspired by ChatGPT. Autonomous agents, agency workflows, CRM, projects, automations, and client portals in one unified operating system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

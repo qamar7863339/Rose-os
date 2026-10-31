@@ -1,0 +1,268 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with role and associated workspace information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique user ID matching auth.uid" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User full name" },
+        "role": { "type": "string", "enum": ["super_admin", "team_member", "client"], "description": "System role" },
+        "workspaceId": { "type": "string", "description": "Primary associated workspace ID" },
+        "clientId": { "type": "string", "description": "Associated client entity ID if role is client" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "email", "role", "createdAt"]
+    },
+    "Admin": {
+      "title": "Admin Record",
+      "description": "Document marking user as authorized platform admin",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "Admin email" },
+        "addedAt": { "type": "string", "description": "Added timestamp" }
+      },
+      "required": ["email", "addedAt"]
+    },
+    "Workspace": {
+      "title": "Agency or Client Workspace",
+      "description": "Multi-tenant root workspace containing isolated agency or client sub-resources",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Workspace ID" },
+        "name": { "type": "string", "description": "Workspace name" },
+        "ownerId": { "type": "string", "description": "Owner user UID" },
+        "type": { "type": "string", "enum": ["agency", "client"], "description": "Workspace type" },
+        "createdAt": { "type": "string", "description": "Timestamp created" }
+      },
+      "required": ["id", "name", "ownerId", "type", "createdAt"]
+    },
+    "WorkspaceMember": {
+      "title": "Workspace Member",
+      "description": "Association mapping user to workspace with specific role",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User UID" },
+        "role": { "type": "string", "enum": ["super_admin", "team_member", "client"], "description": "Role in workspace" },
+        "joinedAt": { "type": "string", "description": "Timestamp joined" }
+      },
+      "required": ["userId", "role", "joinedAt"]
+    },
+    "ClientRecord": {
+      "title": "Client Record",
+      "description": "Client account managed within the workspace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique client ID" },
+        "name": { "type": "string", "description": "Company name" },
+        "industry": { "type": "string", "description": "Industry sector" },
+        "contactName": { "type": "string", "description": "Primary contact name" },
+        "email": { "type": "string", "format": "email", "description": "Contact email" },
+        "phone": { "type": "string", "description": "Contact phone" },
+        "status": { "type": "string", "enum": ["active", "onboarding", "paused", "enterprise"], "description": "Client status" },
+        "monthlySpend": { "type": "number", "description": "Monthly retainer in USD" },
+        "tokensUsed": { "type": "number", "description": "Tokens consumed" },
+        "hoursSaved": { "type": "number", "description": "Hours saved by agents" },
+        "assignedAgentIds": { "type": "array", "description": "IDs of assigned agents" },
+        "assignedProjectsCount": { "type": "number", "description": "Number of active projects" },
+        "automationsCount": { "type": "number", "description": "Number of active automations" },
+        "connectedIntegrations": { "type": "array", "description": "Names of connected services" },
+        "joinedDate": { "type": "string", "description": "Date joined" },
+        "notes": { "type": "string", "description": "Operational notes" },
+        "website": { "type": "string", "description": "Client website or portal URL" }
+      },
+      "required": ["id", "name", "contactName", "email", "status"]
+    },
+    "AgentRecord": {
+      "title": "AI Agent Configuration",
+      "description": "Autonomous AI agent configuration and metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique agent ID" },
+        "name": { "type": "string", "description": "Agent name" },
+        "category": { "type": "string", "description": "Agent category" },
+        "model": { "type": "string", "description": "Foundation model tier" },
+        "description": { "type": "string", "description": "Functional description" },
+        "systemPrompt": { "type": "string", "description": "System prompt and instructions" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Active or paused status" },
+        "assignedClientId": { "type": "string", "description": "Associated client ID" },
+        "assignedClientName": { "type": "string", "description": "Associated client name" },
+        "executionCount": { "type": "number", "description": "Number of executions" },
+        "successRate": { "type": "number", "description": "Success percentage" },
+        "averageResponseTime": { "type": "string", "description": "Average response latency" },
+        "tools": { "type": "array", "description": "Tools available to agent" },
+        "triggers": { "type": "array", "description": "Inbound triggers hooked" },
+        "avatarInitial": { "type": "string", "description": "Two letter avatar initial" },
+        "createdAt": { "type": "string", "description": "Creation date" }
+      },
+      "required": ["id", "name", "category", "model", "status", "systemPrompt"]
+    },
+    "LeadRecord": {
+      "title": "CRM Lead",
+      "description": "CRM lead and deal tracking entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique lead ID" },
+        "name": { "type": "string", "description": "Lead contact name" },
+        "company": { "type": "string", "description": "Prospect company name" },
+        "email": { "type": "string", "format": "email", "description": "Lead email" },
+        "phone": { "type": "string", "description": "Lead phone" },
+        "value": { "type": "number", "description": "Estimated deal value" },
+        "status": { "type": "string", "enum": ["new", "contacted", "qualified", "proposal", "won", "lost"], "description": "Pipeline stage" },
+        "source": { "type": "string", "description": "Lead source channel" },
+        "assignedAgent": { "type": "string", "description": "AI agent assigned" },
+        "clientId": { "type": "string", "description": "Associated client ID" },
+        "clientName": { "type": "string", "description": "Associated client name" },
+        "score": { "type": "number", "description": "AI intent score (0-100)" },
+        "lastContact": { "type": "string", "description": "Time of last touchpoint" },
+        "notes": { "type": "string", "description": "Lead notes" }
+      },
+      "required": ["id", "name", "company", "email", "value", "status"]
+    },
+    "ProjectRecord": {
+      "title": "Project",
+      "description": "Client deliverable or milestone roadmap",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Project ID" },
+        "name": { "type": "string", "description": "Project name" },
+        "clientId": { "type": "string", "description": "Client ID" },
+        "clientName": { "type": "string", "description": "Client name" },
+        "status": { "type": "string", "enum": ["planning", "in_progress", "review", "completed"], "description": "Status" },
+        "progress": { "type": "number", "description": "Progress percentage (0-100)" },
+        "deadline": { "type": "string", "description": "Target completion date" },
+        "budget": { "type": "number", "description": "Project budget" },
+        "assignedAgents": { "type": "array", "description": "Names of assigned agents" },
+        "tasksCount": { "type": "number", "description": "Total tasks count" },
+        "completedTasks": { "type": "number", "description": "Completed tasks count" },
+        "description": { "type": "string", "description": "Scope description" }
+      },
+      "required": ["id", "name", "clientId", "status"]
+    },
+    "TaskRecord": {
+      "title": "Task Item",
+      "description": "Task checklist item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Task ID" },
+        "projectId": { "type": "string", "description": "Project ID" },
+        "projectName": { "type": "string", "description": "Project title" },
+        "title": { "type": "string", "description": "Task title" },
+        "status": { "type": "string", "enum": ["todo", "in_progress", "done"], "description": "Task status" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"], "description": "Task priority" },
+        "agentAutomated": { "type": "boolean", "description": "Whether automated by an agent" },
+        "assignedTo": { "type": "string", "description": "Assignee name or agent" },
+        "dueDate": { "type": "string", "description": "Due date" }
+      },
+      "required": ["id", "title", "status", "priority"]
+    },
+    "AutomationRecord": {
+      "title": "Automation Workflow",
+      "description": "Trigger-action workflow configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Workflow ID" },
+        "name": { "type": "string", "description": "Workflow title" },
+        "description": { "type": "string", "description": "Description" },
+        "triggerApp": { "type": "string", "description": "Trigger source app" },
+        "triggerEvent": { "type": "string", "description": "Trigger event type" },
+        "actions": { "type": "array", "description": "List of action steps" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Active status" },
+        "executionCount": { "type": "number", "description": "Total runs" },
+        "successRate": { "type": "number", "description": "Success percentage" },
+        "lastRun": { "type": "string", "description": "Timestamp of last execution" },
+        "associatedClientId": { "type": "string", "description": "Client ID if scoped" }
+      },
+      "required": ["id", "name", "triggerApp", "triggerEvent", "status"]
+    },
+    "IntegrationRecord": {
+      "title": "Integration Connector",
+      "description": "Connected third-party service metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Integration ID" },
+        "name": { "type": "string", "description": "Service name" },
+        "category": { "type": "string", "description": "Service category" },
+        "icon": { "type": "string", "description": "Icon identifier" },
+        "description": { "type": "string", "description": "Description" },
+        "status": { "type": "string", "enum": ["connected", "disconnected"], "description": "Connection status" },
+        "connectedAccount": { "type": "string", "description": "Connected account email or ID" },
+        "lastSync": { "type": "string", "description": "Timestamp of last sync" },
+        "authScopes": { "type": "array", "description": "Authorized scopes" },
+        "dataTransferred": { "type": "string", "description": "Volume transferred" }
+      },
+      "required": ["id", "name", "category", "status"]
+    },
+    "DocumentRecord": {
+      "title": "Knowledge Document",
+      "description": "Knowledge document metadata stored in Firestore with file in Firebase Storage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Document ID" },
+        "title": { "type": "string", "description": "Document title" },
+        "category": { "type": "string", "description": "Category" },
+        "fileType": { "type": "string", "description": "File format extension" },
+        "fileSize": { "type": "string", "description": "File size label" },
+        "storagePath": { "type": "string", "description": "Firebase Storage path" },
+        "downloadUrl": { "type": "string", "description": "File download URL" },
+        "clientId": { "type": "string", "description": "Associated client ID" },
+        "clientName": { "type": "string", "description": "Associated client name" },
+        "dateAdded": { "type": "string", "description": "Date added" },
+        "chunksCount": { "type": "number", "description": "Extracted vector chunks" },
+        "summary": { "type": "string", "description": "Document synopsis" }
+      },
+      "required": ["id", "title", "category", "fileType"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles and RBAC role mapping"
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "Admin" },
+      "description": "Global admin privilege verification documents"
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": { "$ref": "Workspace" },
+      "description": "Multi-tenant workspace container"
+    },
+    "/workspaces/{workspaceId}/members/{userId}": {
+      "schema": { "$ref": "WorkspaceMember" },
+      "description": "Workspace member roles and permissions"
+    },
+    "/workspaces/{workspaceId}/clients/{clientId}": {
+      "schema": { "$ref": "ClientRecord" },
+      "description": "Clients managed within workspace"
+    },
+    "/workspaces/{workspaceId}/agents/{agentId}": {
+      "schema": { "$ref": "AgentRecord" },
+      "description": "Autonomous AI agent configurations"
+    },
+    "/workspaces/{workspaceId}/leads/{leadId}": {
+      "schema": { "$ref": "LeadRecord" },
+      "description": "CRM leads and opportunities"
+    },
+    "/workspaces/{workspaceId}/projects/{projectId}": {
+      "schema": { "$ref": "ProjectRecord" },
+      "description": "Projects and client roadmaps"
+    },
+    "/workspaces/{workspaceId}/tasks/{taskId}": {
+      "schema": { "$ref": "TaskRecord" },
+      "description": "Project task items"
+    },
+    "/workspaces/{workspaceId}/automations/{automationId}": {
+      "schema": { "$ref": "AutomationRecord" },
+      "description": "Automation workflow configurations"
+    },
+    "/workspaces/{workspaceId}/integrations/{integrationId}": {
+      "schema": { "$ref": "IntegrationRecord" },
+      "description": "Connected third-party integrations"
+    },
+    "/workspaces/{workspaceId}/documents/{documentId}": {
+      "schema": { "$ref": "DocumentRecord" },
+      "description": "Knowledge documents linked to Storage"
+    }
+  }
+}
